@@ -5,6 +5,8 @@ var scene, camera, renderer; //Three.js variables
 var width, height, aspect; //Window variables
 
 var selected = -1; //Stores which cube is currently selected
+var translating = false; //Stores whether mouse button is pressed so mousemove can translate a cube
+var translatingplane; //Invisible plane used for translation
 
 var objects = [] //Stores instances of Cube class
 var cubes = []; //Stores cubes in scene
@@ -27,20 +29,24 @@ function createCube(x, y, z){
 	//One mesh for upper face, another for lower, and another for sides
 	
 	var upperLines = object.genUpperLines(x,y,z);
+	upperLines.position.set(x,y,z);
 	
 	var lowerLines = object.genLowerLines(x,y,z);
+	lowerLines.position.set(x,y,z);
 	
 	var side_line1_geometry = new THREE.Geometry();
-	side_line1_geometry.vertices.push(new THREE.Vector3(x+0.5,y-0.5,z-0.5),
-									  new THREE.Vector3(x+0.5,y-0.5,z+0.5));
+	side_line1_geometry.vertices.push(new THREE.Vector3(+0.5,-0.5,-0.5),
+									  new THREE.Vector3(+0.5,-0.5,+0.5));
 	
 	var side1 = new THREE.Line(side_line1_geometry, line_material);
+	side1.position.set(x,y,z);
 	
 	var side_line2_geometry = new THREE.Geometry();
-	side_line2_geometry.vertices.push(new THREE.Vector3(x-0.5,y+0.5,z-0.5),
-									  new THREE.Vector3(x-0.5,y+0.5,z+0.5));
+	side_line2_geometry.vertices.push(new THREE.Vector3(-0.5,+0.5,-0.5),
+									  new THREE.Vector3(-0.5,+0.5,+0.5));
 	
 	var side2 = new THREE.Line(side_line2_geometry, line_material);
+	side2.position.set(x,y,z);
 	
 	//Add things to scene
 	scene.add(upperLines);
@@ -78,12 +84,12 @@ Cube.prototype.init = function(cube, center, upLines, downLines, sideLine1, side
 Cube.prototype.genUpperLines = function(x, y, z){
 	var line_material = new THREE.LineBasicMaterial({color: 0x7c7c7c});
 	var upper_line_geometry = new THREE.Geometry();
-	upper_line_geometry.vertices.push(new THREE.Vector3(x-0.5,y-0.5,z+0.5),
-									  new THREE.Vector3(x-0.5,y+0.5,z+0.5),
-									  new THREE.Vector3(x+0.5,y+0.5,z+0.5),
-									  new THREE.Vector3(x+0.5,y-0.5,z+0.5),
-									  new THREE.Vector3(x-0.5,y-0.5,z+0.5),
-									  new THREE.Vector3(x-0.5,y-0.5,z-0.5));
+	upper_line_geometry.vertices.push(new THREE.Vector3(-0.5,-0.5,+0.5),
+									  new THREE.Vector3(-0.5,+0.5,+0.5),
+									  new THREE.Vector3(+0.5,+0.5,+0.5),
+									  new THREE.Vector3(+0.5,-0.5,+0.5),
+									  new THREE.Vector3(-0.5,-0.5,+0.5),
+									  new THREE.Vector3(-0.5,-0.5,-0.5));
 	var tmp = new THREE.Line(upper_line_geometry, line_material);
 	return tmp;
 }
@@ -91,12 +97,12 @@ Cube.prototype.genUpperLines = function(x, y, z){
 Cube.prototype.genLowerLines = function(x, y, z){
 	var line_material = new THREE.LineBasicMaterial({color: 0x7c7c7c});
 	var lower_line_geometry = new THREE.Geometry();
-	lower_line_geometry.vertices.push(new THREE.Vector3(x+0.5,y+0.5,z-0.5),
-									  new THREE.Vector3(x+0.5,y-0.5,z-0.5),
-									  new THREE.Vector3(x-0.5,y-0.5,z-0.5),
-									  new THREE.Vector3(x-0.5,y+0.5,z-0.5),
-									  new THREE.Vector3(x+0.5,y+0.5,z-0.5),
-									  new THREE.Vector3(x+0.5,y+0.5,z+0.5));
+	lower_line_geometry.vertices.push(new THREE.Vector3(+0.5,+0.5,-0.5),
+									  new THREE.Vector3(+0.5,-0.5,-0.5),
+									  new THREE.Vector3(-0.5,-0.5,-0.5),
+									  new THREE.Vector3(-0.5,+0.5,-0.5),
+									  new THREE.Vector3(+0.5,+0.5,-0.5),
+									  new THREE.Vector3(+0.5,+0.5,+0.5));
 	var tmp = new THREE.Line(lower_line_geometry, line_material);
 	return tmp;
 }
@@ -115,6 +121,14 @@ Cube.prototype.deleteCube = function(){
 	
 	//Reset selected cube to none
 	selected = -1;
+}
+
+Cube.prototype.moveCube = function(point){
+	this.cube.position.copy(point);
+	this.upperLines.position.copy(point);
+	this.downLines.position.copy(point);
+	this.sideLine1.position.copy(point);
+	this.sideLine2.position.copy(point);
 }
 
 //----- Main function calls
@@ -150,8 +164,13 @@ function init(){
     controls.staticMoving = true;
     controls.dynamicDampingFactor = 0.2;
 	
-	//Create a light source relative to camera's position
-	//???
+	//Create the translation plane wherever
+	plane = new THREE.Mesh(
+		new THREE.PlaneBufferGeometry(10000,10000,8,8),
+		new THREE.MeshBasicMaterial({visible:false})
+		);
+	scene.add(plane);
+	plane.lookAt(camera.position); //Set plane to camera position
 	
 	//Add event listeners
 	window.addEventListener('resize', onWindowResize, false);
@@ -196,6 +215,16 @@ function onMouseMove(event) {
 	mousepos.y = - (event.clientY / height) * 2 + 1;
 	raycaster.setFromCamera(mousepos, camera);
 	
+	if(translating){
+		//Update object coordinates based on plane and ray casting
+		var intersects = raycaster.intersectObject(plane);
+		if (intersects.length > 0){
+			objects[selected].moveCube(intersects[0].point);
+		}
+		return;
+	}
+	
+	//Highlight nearest cube of ray casting
 	var intersections = raycaster.intersectObjects(cubes);
 	for (i = 0; i < cubes.length; i++){
 		if (i === selected) continue;
@@ -229,18 +258,23 @@ function onMouseDown(event) {
 							tmp.material.color.setHex(0x9ADBF3);
 							break;
 						}
+						//Unselect previous selection
 						if (selected+1) cubes[selected].material.color.setHex(0x9ADBF3);
 						selected = i;
+						//Enable translation, disable camera controls
+						translating = true;
+						controls.enabled = false;
+						plane.lookAt(camera.position); //Set plane to camera position
 					}
 				}
 			}
+			else selected = -1;
 			break;
 
 		case 2: //right click
 			//We will always insert a new cube in the plane z=0, so we find the
 			//world coordinates for the mouse click on that plane
 			
-			console.log("no")
 			var vector = new THREE.Vector3();
 			vector.set(mousepos.x, mousepos.y, 1);
 			vector.unproject(camera);
@@ -256,7 +290,12 @@ function onMouseDown(event) {
 	}
 }
 
-function onMouseUp(event){}
+function onMouseUp(event){
+	//Stops translation and enables camera controls
+	translating = false; //No longer translating
+	controls.enabled = true;
+	plane.position.copy(cubes[selected].position);
+}
 
 function onKeyPress(event){
 	//Handles keydown events for deleting the selected cube
