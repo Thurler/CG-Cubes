@@ -18,12 +18,12 @@ https://github.com/Thurler/CG-Cubes
 file "index.html" in the browser of your choice. Once it is
 open, you can do the following:
 
-Insert cubes in the scene	- Right click anywhere
-Select a cube in the scene	- Left click on top of a cube
-Remove the selected cube	- Press "Delete" or "Backspace"
-Move the selected cube		- Drag and drop it on the screen
-Rotate the scene			- Left click and drag anywhere*
-Rotate the selected cube	- Right click anywhere**
+Insert cubes in the scene  - Right click anywhere
+Select a cube in the scene - Left click on top of a cube
+Remove the selected cube   - Press "Delete" or "Backspace"
+Move the selected cube     - Drag and drop it on the screen
+Rotate the scene           - Left click and drag anywhere*
+Rotate the selected cube   - Right click anywhere**
 
 *Provided you don't click on a cube
 **A cube must be selected, otherwise it will make a new one
